@@ -7,21 +7,24 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 def get_public_repos(base_url):
     repos = []
     page = 1
-    while True:
-        response = requests.get(
-            f"{base_url}/api/v4/projects",
-            headers={},
-            verify=False,
-            params={'page': page}
-        )
-        if response.status_code != 200:
-            print(f"❌ Request failed on {base_url} (status code {response.status_code})")
-            break
-        data = response.json()
-        if not data:
-            break
-        repos.extend(data)
-        page += 1
+    try:
+        while True:
+            response = requests.get(
+                f"{base_url}/api/v4/projects",
+                headers={},
+                verify=False,
+                params={'page': page}
+            )
+            if response.status_code != 200:
+                print(f"❌ Request failed on {base_url} (status code {response.status_code})")
+                break
+            data = response.json()
+            if not data:
+                break
+            repos.extend(data)
+            page += 1
+    except Exception as e:
+        repos = []
     return repos
 
 def scan_public_repos(url_arg, silent=True):
