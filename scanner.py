@@ -92,6 +92,60 @@ def scan_internal_repos(token_or_user, password, url_arg, silent=True):
             print(f"[{visibility}] {repo.get('web_url')}")
     return all_repos
 
+
+def get_specific_repo(repo_url, headers):
+    from urllib.parse import urlparse, quote
+    parsed = urlparse(repo_url)
+    base_url = f"{parsed.scheme}://{parsed.netloc}"
+    path = parsed.path.lstrip('/')
+    encoded_path = quote(path, safe="")
+    
+    response = requests.get(
+            f"{base_url}/api/v4/projects/{encoded_path}",
+            headers=headers,
+            verify=False
+        )
+    if response.status_code != 200:
+        print(f"❌ Error {response.status_code} on {base_url}")
+        return []
+    data = response.json()
+    if not data:
+        return []
+    return data
+
+def scan_list_repos(token_or_user, password, url_arg, silent=True):
+    from auth import get_access_token
+    
+    urls = get_urls_from_arg(url_arg)
+    all_repos = []
+
+    for repo_url in urls:
+        print(f"🔐 Scanning with authentication: {repo_url}")
+
+        if password is None:
+            headers = {'Private-Token': token_or_user}
+        else:
+            print(repo_url)
+            access_token = get_access_token(extract_base_url(repo_url), token_or_user, password)
+            if not access_token:
+                print(f"❌ Failed to retrieve access token for {repo_url}")
+                continue
+            headers = {"Authorization": f"Bearer {access_token}"}
+
+        repos = get_specific_repo(repo_url, headers)
+        all_repos.append(repos)
+    def sort_key(repo):
+        order = {'public': 0, 'internal': 1, 'private': 2}
+        return order.get(repo.get('visibility', 'unknown'), 3)
+
+    all_repos.sort(key=sort_key)
+    
+    if not silent:
+        for repo in all_repos:
+            visibility = repo.get("visibility", "unknown").upper()
+            print(f"[{visibility}] {repo.get('web_url')}")
+    return all_repos
+
 def get_urls_from_arg(url_arg):
     if os.path.isfile(url_arg):
         with open(url_arg, 'r') as f:
@@ -102,3 +156,7 @@ def get_urls_from_arg(url_arg):
 
 def normalize_url(url):
     return url.rstrip('/')
+
+def extract_base_url(url):
+    tmp = url.split('/')
+    return tmp[0] + '//' + tmp[2]

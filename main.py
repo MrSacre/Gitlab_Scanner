@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import sys
-from scanner import scan_public_repos, scan_internal_repos
+from scanner import scan_public_repos, scan_internal_repos, scan_list_repos
 from leak_detector import check_leak_in_repo, get_last_commit, extract_base_url
 from database import ScanDatabase
 
@@ -29,6 +29,25 @@ def validate_internal_auth(args):
     if not has_token and not has_login:
         print("❌ You must provide either --token or --user + --password for this mode.")
         sys.exit(1)
+
+def load_repos_from_file(filepath):
+    """Charge une liste d'URLs depuis un fichier et les transforme en objets repo"""
+    repos = []
+    try:
+        with open(filepath, 'r') as f:
+            for line in f:
+                url = line.strip()
+                if url and not url.startswith('#'):
+                    # Créer un objet repo minimal avec l'URL
+                    repos.append({
+                        'web_url': url,
+                        'id': None,  # Sera extrait si nécessaire
+                        'visibility': 'unknown'
+                    })
+    except FileNotFoundError:
+        print(f"❌ File not found: {filepath}")
+        sys.exit(1)
+    return repos
 
 def scan_repo_list(repos, rescan, auth_config):
     db = ScanDatabase()
@@ -97,6 +116,15 @@ def main():
     leaks_internal.add_argument("-u", "--user", help="Username")
     leaks_internal.add_argument("-p", "--password", help="Password")
 
+    # Nouveau mode "list" pour scanner une liste d'URLs
+    leaks_list = leaks_subparsers.add_parser("list", help="Leak scan from a list of URLs")
+    leaks_list.add_argument("-l", "--list", required=True, help="File containing list of repository URLs")
+    leaks_list.add_argument("--rescan", choices=["true", "false"], default="false", 
+                          help="Force rescan even if leak was found and nothing changed")
+    leaks_list.add_argument("-t", "--token", help="Access token")
+    leaks_list.add_argument("-u", "--user", help="Username")
+    leaks_list.add_argument("-p", "--password", help="Password")
+
     args = parser.parse_args()
     auth_config = configure_auth(args) if hasattr(args, 'token') else {'mode': 'public'}
     
@@ -122,6 +150,16 @@ def main():
                 repos = scan_internal_repos(args.token, None, args.url)
             else:
                 repos = scan_internal_repos(args.user, args.password, args.url)
+            scan_repo_list(repos, rescan_enabled, auth_config)
+        elif args.mode == "list":
+            validate_internal_auth(args)
+            auth_config = configure_auth(args)
+            repos = load_repos_from_file(args.list)
+            print(f"📋 Loaded {len(repos)} repositories from {args.list}")
+            if args.token:
+                repos = scan_list_repos(args.token, None, args.url)
+            else:
+                repos = scan_list_repos(args.user, args.password, args.list)
             scan_repo_list(repos, rescan_enabled, auth_config)
 
 if __name__ == "__main__":

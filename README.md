@@ -51,6 +51,20 @@ python main.py scan internal -U https://gitlab.example.com -u username -p passwo
 python main.py leaks internal -U https://gitlab.example.com -u username -p password
 ```
 
+### Scan specific Repositories
+
+Using a token:
+```bash
+python main.py leaks list -l .\url.txt -t YOUR_TOKEN
+python main.py leaks list -l .\url.txt -t YOUR_TOKEN
+```
+
+Using username/password:
+```bash
+python main.py leaks list -l .\url.txt -u username -p password
+python main.py leaks list -l .\url.txt -u username -p password
+```
+
 ### Using URL Lists
 
 You can provide a file containing multiple GitLab URLs:
